@@ -23,7 +23,7 @@ motor motorA, motorB;
 
 unsigned long timeNow;
 unsigned long timeElapsed;
-int timeStart;
+unsigned long timeStart;
 unsigned int timeInterval = 10*1000; // 10 seconds
 
 boolean start;
