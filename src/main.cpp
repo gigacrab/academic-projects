@@ -4,8 +4,7 @@
 #include <PinChangeInterrupt.h>
 
 void INT0_ISR(void);
-void setSpeed(byte, byte);
-void go(String);
+void go(byte, byte);
 
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7); // RS, E, D4, D5, D6, D7
 
@@ -17,39 +16,30 @@ const int ENB = 3;
 const int IN3 = A1;
 const int IN4 = A2;
 
-const int ENCODER_RIGHT = 2;
-const int ENCODER_LEFT = A3;
+const int ENCODER_R = 2;
+const int ENCODER_L = A3;
+
+const int IR_L = A5;
+const int IR_M = 1;
+const int IR_R = A4;
 
 volatile uint8_t previousPortCState = 0;
 
-typedef struct {
-  byte speed;
-  struct {
-    boolean forward;
-    boolean backward;
-  } direction;
-} motor; 
-
-motor motorA, motorB;
-
-unsigned long millisNow;
-unsigned long millisElapsed;
-unsigned long millisStart;
+unsigned long millisNow, millisElapsed, millisStart;
 unsigned int millisInterval = 10*1000; // 10 seconds
 
-unsigned long microNowRight;
-unsigned int prevSampleRight;
-unsigned long prevMicroRight;
+unsigned long microNowRight, prevSampleRight, prevMicroRight;
 int pulseCountRight;
 
-unsigned long microNowLeft;
-unsigned int prevSampleLeft;
-unsigned long prevMicroLeft;
+unsigned long microNowLeft, prevSampleLeft, prevMicroLeft;
 int pulseCountLeft;
 
 boolean start;
 
 int distance;
+
+byte defaultSpeedL = 107;
+byte motorspeedR = 150;
 
 void setup() {
   lcd.begin(16, 2);
@@ -62,18 +52,16 @@ void setup() {
   pinMode(IN3, OUTPUT);
   pinMode(IN4, OUTPUT);
 
-  pinMode(ENCODER_RIGHT, INPUT);
+  pinMode(IR_R, INPUT);
+  pinMode(IR_M, INPUT);
+  pinMode(IR_L, INPUT);
+
+  pinMode(ENCODER_R, INPUT);
   pinMode(A3, INPUT);
-  attachInterrupt(digitalPinToInterrupt(ENCODER_RIGHT), INT0_ISR, RISING);
-
-  // Enable PCINT1 group (for pin A0-A5)
-  PCICR |= (1 << PCIE1);
-
-  // Enable PCINT11 (for pin A3)
-  PCMSK1 |= (1 << PCINT11);
-
-  // Store initial state of PORTC
-  previousPortCState = PINC;
+  attachInterrupt(digitalPinToInterrupt(ENCODER_R), INT0_ISR, RISING);
+  PCICR |= (1 << PCIE1); // Enable PCINT1 group (for pin A0-A5)
+  PCMSK1 |= (1 << PCINT11); // Enable PCINT11 (for pin A3)
+  previousPortCState = PINC; // Store initial state of PORTC
 
   lcd.print("Select to start!");
 }
@@ -88,14 +76,34 @@ void loop() {
     while(start){
       millisNow = millis();
       millisElapsed = millisNow - millisStart;
-      if (millisElapsed <= millisInterval){
-        setSpeed(107, 150);
-        go("forward");
-      } else {
-        go("stop");
-        start = false;
+      
+      boolean L = digitalRead(IR_L);
+      boolean M = digitalRead(IR_M);  
+      boolean R = digitalRead(IR_R);
+
+      byte pattern = (L << 2) | (M << 1) | R;
+
+      switch(pattern){
+        case 0b001:
+          go(defaultSpeedL / 2, motorspeedR);
+          break;
+        case 0b011:
+          go(-defaultSpeedL, motorspeedR);
+          break;
+        case 0b100:
+          go(defaultSpeedL, motorspeedR / 2);
+          break;
+        case 0b101:
+          go(defaultSpeedL, motorspeedR);
+          break;       
+        case 0b110:
+          go(defaultSpeedL, -motorspeedR);
+          break;
+        default:
+          go(0, 0);
       }
-      lcd.setCursor(0, 1);
+
+      lcd.setCursor(0, 1);  
       lcd.print("Time: " + String(millisElapsed/1000.0));
     }
     start = true;
@@ -135,29 +143,14 @@ void INT0_ISR(void){
   }
 }
 
-void setSpeed(byte speedA, byte speedB){
-  motorA.speed = speedA;
-  motorB.speed = speedB;
-  analogWrite(ENA, motorA.speed);
-  analogWrite(ENB, motorB.speed);
-}
+void go(byte speedL, byte speedR){
+  digitalWrite(IN1, (speedR <= 0)? LOW : HIGH);
+  digitalWrite(IN2, (speedR >= 0)? LOW : HIGH);
 
-void go(String direction){
-  boolean value1 = LOW;
-  boolean value2 = LOW;
-  if (direction == "forward"){
-    value1 = LOW;
-    value2 = HIGH;
-  } else if (direction == "backward"){
-    value1 = HIGH;
-    value2 = LOW;
-  } else if (direction == "stop"){
-    setSpeed(0, 0);
-  }
-  motorA.direction.backward = motorB.direction.backward = value1;
-  motorB.direction.forward = motorA.direction.forward = value2;
-  digitalWrite(IN1, motorA.direction.forward);
-  digitalWrite(IN2, motorA.direction.backward);
-  digitalWrite(IN3, motorB.direction.forward);
-  digitalWrite(IN4, motorB.direction.backward);
+  digitalWrite(IN3, (speedL <= 0)? LOW : HIGH);
+  digitalWrite(IN4, (speedL >= 0)? LOW : HIGH);
+
+  // Apply speed, constraining to the 0-255 PWM range
+  analogWrite(ENB, constrain(abs(speedL), 0, 255));
+  analogWrite(ENA, constrain(abs(speedR), 0, 255));
 }
