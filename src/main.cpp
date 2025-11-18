@@ -1,3 +1,6 @@
+// 3 ir sensor
+// pid
+
 #include <Arduino.h>
 #include <LiquidCrystal.h>
 #include <math.h>
@@ -38,10 +41,16 @@ boolean start;
 
 int distance;
 
-int defaultSpeedL = 100; // 107
-int defaultSpeedR = 100; // 150
+int defaultSpeedL = 255; // 107
+int defaultSpeedR = 255; // 150
+
+int currentSpeedL;
+int currentSpeedR;
 
 enum dir {STRAIGHT, LEFT, RIGHT};
+
+unsigned long stopMillis;
+boolean stop;
 
 void setup() {
   lcd.begin(16, 2);
@@ -112,34 +121,47 @@ void loop() {
       byte pattern = (L << 1) | R;
 
       switch(pattern){
+        
         case 0b11:
           switch(lastDir){
             case STRAIGHT:
-              go(defaultSpeedL, defaultSpeedR);
+              currentSpeedL = defaultSpeedL; 
+              currentSpeedR = defaultSpeedR;
               lastDir = STRAIGHT;
               break;
             case LEFT:
-              go(-150, 255);
+              currentSpeedL = -150;
+              currentSpeedR = 255;
               break;
             case RIGHT:
-              go(255, -150);
+              currentSpeedL = 255;
+              currentSpeedR = -150;
               break;
           }
           break;
         case 0b10:
-          go(255, 200);
+          currentSpeedL = 255;
+          currentSpeedR = 200;
           lastDir = RIGHT;
           break;
         case 0b01:
-          go(200, 255);
+          currentSpeedL = 200;
+          currentSpeedR = 255;
           lastDir = LEFT;
           break;
-        case 0b00:
-          go(0, 0);
-          lastDir = STRAIGHT;
-          start = false;
-          break;
       }
+      if (pattern == 0b00) {
+        if (stop && millisNow - stopMillis > 40){
+          currentSpeedL = 0;
+          currentSpeedR = 0;
+          start = false;
+        } else if (!stop) {
+          stop = true;
+          stopMillis = millisNow;
+        }
+      } else stop = false;
+
+      go(currentSpeedL, currentSpeedR);
 
       lcd.setCursor(0, 1);  
       lcd.print("Time: " + String(millisElapsed/1000.0));
@@ -164,24 +186,26 @@ ISR(PCINT1_vect){
 
   // Rising edge: previous = 0, current = 1
   if (!(previousPortCState & (1 << 3)) && (currentPortCState  & (1 << 3))) {
-    microNowLeft = micros();
+    pulseCountLeft += (currentSpeedL > 0)? 1 : -1;
+    /*microNowLeft = micros();
 
     if ((microNowLeft - prevMicroLeft) > 0) {
         prevSampleLeft = microNowLeft - prevMicroLeft;
         prevMicroLeft = microNowLeft;
-        pulseCountLeft++;
-    }
+        pulseCountLeft += (currentSpeedL > 0)? 1 : -1;
+    }*/
   }
   previousPortCState = currentPortCState;
 }
 
 void INT0_ISR(void){
-  microNowRight = micros();
+  pulseCountRight += (currentSpeedR > 0)? 1 : -1;
+  /*microNowRight = micros();
   if (microNowRight - prevMicroRight > 0){
     prevSampleRight = microNowRight - prevMicroRight; 
     prevMicroRight = microNowRight;
-    pulseCountRight++;
-  }
+    pulseCountRight += (currentSpeedR > 0)? 1 : -1;
+  }*/
 }
 
 void go(int speedL, int speedR){ 
