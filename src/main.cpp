@@ -4,12 +4,22 @@
 #include <Arduino.h>
 #include <LiquidCrystal.h>
 #include <math.h>
-#include <PinChangeInterrupt.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
 
-void INT0_ISR(void);
 void go(int, int);
+float kalmanFilter(float newAngle, float newRate, float dt, float &angle, float &bias);
 
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7); // RS, E, D4, D5, D6, D7
+Adafruit_MPU6050 mpu;
+
+float x_angle, y_angle;
+float x_bias, y_bias;
+float P[2][2] = {{1, 0}, {0, 1}};
+
+float q_angle = 0.01;
+float q_bias = 0.01;
+float r_measure = 0.01;
 
 const int ENA = 11;
 const int IN1 = 13;
@@ -19,23 +29,11 @@ const int ENB = 3;
 const int IN3 = A1;
 const int IN4 = A2;
 
-const int ENCODER_R = 2;
-const int ENCODER_L = A3;
-
 const int IR_L = A5;
 //const int IR_M = 1;
 const int IR_R = A4;
 
-volatile uint8_t previousPortCState = 0;
-
 unsigned long millisNow, millisElapsed, millisStart;
-unsigned int millisInterval = 10*1000; // 10 seconds
-
-unsigned long microNowRight, prevSampleRight, prevMicroRight;
-int pulseCountRight;
-
-unsigned long microNowLeft, prevSampleLeft, prevMicroLeft;
-int pulseCountLeft;
 
 boolean start;
 
@@ -53,8 +51,21 @@ unsigned long stopMillis;
 boolean stop;
 
 void setup() {
+  // hardware initializations
   lcd.begin(16, 2);
   Serial.begin(9600);
+
+  if (!mpu.begin()){
+    Serial.println("MPU6050 not found!");
+    while (1) delay(10);
+  }
+
+  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
+  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+  mpu.setFilterBandwidth(MPU6050_BAND_10_HZ);
+
+  // allowing settings to take effect
+  delay(100);
 
   pinMode(ENA, OUTPUT);
   pinMode(IN1, OUTPUT);
@@ -67,53 +78,27 @@ void setup() {
   //pinMode(IR_M, INPUT);
   pinMode(IR_L, INPUT);
 
-  pinMode(ENCODER_R, INPUT);
-  pinMode(A3, INPUT);
-  attachInterrupt(digitalPinToInterrupt(ENCODER_R), INT0_ISR, RISING);
-  PCICR |= (1 << PCIE1); // Enable PCINT1 group (for pin A0-A5)
-  PCMSK1 |= (1 << PCINT11); // Enable PCINT11 (for pin A3)
-  previousPortCState = PINC; // Store initial state of PORTC
-
   lcd.print("Select to start!");
 }
 
 void loop() {
   enum dir lastDir = STRAIGHT;
   if (analogRead(A0) > 600 && analogRead(A0) < 800){
-    millisStart = millis();
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Moving forward!");
 
     while(start){
-      millisNow = millis();
-      millisElapsed = millisNow - millisStart;
-      
-      /*boolean L = digitalRead(IR_L);
-      boolean M = digitalRead(IR_M);  
-      boolean R = digitalRead(IR_R);
+      sensors_event_t a, g, temp;
+      mpu.getEvent(&a, &g, &temp);
 
-      byte pattern = (L << 2) | (M << 1) | R;
+      static unsigned long prevTime = millis();
+      float dt = (millis() - prevTime) / 1000.0;
+      prevTime = millis();
+      float filteredX = kalmanFilter(a.acceleration.x, g.gyro.x, dt, x_angle, x_bias);
+      float filteredY = kalmanFilter(a.acceleration.y, g.gyro.y, dt, y_angle, y_bias);
 
-      switch(pattern){
-        case 0b001:
-          go(defaultSpeedL / 2, motorspeedR);
-          break;
-        case 0b011:
-          go(-defaultSpeedL, motorspeedR);
-          break;
-        case 0b100:
-          go(defaultSpeedL, motorspeedR / 2);
-          break;
-        case 0b101:
-          go(defaultSpeedL, motorspeedR);
-          break;       
-        case 0b110:
-          go(defaultSpeedL, -motorspeedR);
-          break;
-        default:
-          go(0, 0);
-      }*/
+      Serial.println(String(filteredX) + " " + String(filteredY));
 
       boolean L = digitalRead(IR_L);  
       boolean R = digitalRead(IR_R);
@@ -162,50 +147,12 @@ void loop() {
       } else stop = false;
 
       go(currentSpeedL, currentSpeedR);
-
-      lcd.setCursor(0, 1);  
-      lcd.print("Time: " + String(millisElapsed/1000.0));
     }
     start = true;
     lcd.setCursor(0, 0);
     //lcd.print("Select to start!");
     //lcd.setCursor(0, 1);
-    lcd.print("Distance: ");
-    distance = (pulseCountRight + pulseCountLeft) / 2 * M_PI * 6.5 / 20;
-    Serial.println(pulseCountLeft);
-    Serial.println(pulseCountRight);
-    lcd.print(distance);
-    lcd.print("cm   ");
-    pulseCountRight = 0;
-    pulseCountLeft = 0;
   }
-}
-
-ISR(PCINT1_vect){
-  uint8_t currentPortCState = PINC;
-
-  // Rising edge: previous = 0, current = 1
-  if (!(previousPortCState & (1 << 3)) && (currentPortCState  & (1 << 3))) {
-    pulseCountLeft += (currentSpeedL > 0)? 1 : -1;
-    /*microNowLeft = micros();
-
-    if ((microNowLeft - prevMicroLeft) > 0) {
-        prevSampleLeft = microNowLeft - prevMicroLeft;
-        prevMicroLeft = microNowLeft;
-        pulseCountLeft += (currentSpeedL > 0)? 1 : -1;
-    }*/
-  }
-  previousPortCState = currentPortCState;
-}
-
-void INT0_ISR(void){
-  pulseCountRight += (currentSpeedR > 0)? 1 : -1;
-  /*microNowRight = micros();
-  if (microNowRight - prevMicroRight > 0){
-    prevSampleRight = microNowRight - prevMicroRight; 
-    prevMicroRight = microNowRight;
-    pulseCountRight += (currentSpeedR > 0)? 1 : -1;
-  }*/
 }
 
 void go(int speedL, int speedR){ 
@@ -218,4 +165,27 @@ void go(int speedL, int speedR){
   // Apply speed, constraining to the 0-255 PWM range
   analogWrite(ENB, constrain(abs(speedL), 0, 255));
   analogWrite(ENA, constrain(abs(speedR), 0, 255));
+}
+
+float kalmanFilter(float newAngle, float newRate, float dt, float &angle, float &bias) {
+  float rate = newRate - bias;  // Remove bias from gyroscope rate
+  angle += dt * rate;  // Estimate new angle
+  // Update estimation error covariance
+  P[0][0] += dt * (dt * P[1][1] - P[0][1] - P[1][0] + q_angle);
+  P[0][1] -= dt * P[1][1];
+  P[1][0] -= dt * P[1][1];
+  P[1][1] += q_bias * dt;
+  // Compute Kalman gain
+  float S = P[0][0] + r_measure;
+  float K[2] = { P[0][0] / S, P[1][0] / S };
+  // Update estimates with measurement
+  float y = newAngle - angle;
+  angle += K[0] * y;
+  bias += K[1] * y;
+  // Update error covariance matrix
+  P[0][0] -= K[0] * P[0][0];
+  P[0][1] -= K[0] * P[0][1];
+  P[1][0] -= K[1] * P[0][0];
+  P[1][1] -= K[1] * P[0][1];
+  return angle;  // Return the filtered angle
 }
