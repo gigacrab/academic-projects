@@ -1,5 +1,6 @@
 *
 !.gitignore
-!pw/**/*.cpp
+!pw/
+!pw/**
 !src/
 !src/main.cpp
