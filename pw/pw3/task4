@@ -1,0 +1,129 @@
+#include <LiquidCrystal.h>
+#include <SoftwareSerial.h>
+
+LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
+
+const int ENA = 11;
+const int IN1 = 13;
+const int IN2 = 12;
+const int ENB = 3;
+const int IN3 = A1;
+const int IN4 = A2;
+
+int motorSpeed = 200;
+
+SoftwareSerial BT(0, 1);
+char lastCommand = 'S';
+
+void setup() {
+  pinMode(ENA, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(ENB, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+
+  lcd.begin(16, 2);
+  lcd.print("Hi, we're");
+  lcd.setCursor(0, 1);
+  lcd.print("Group E11");
+
+  BT.begin(9600);
+}
+
+void moveForward() {
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, motorSpeed);
+  analogWrite(ENB, motorSpeed);
+}
+
+void moveLeft() {
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+  analogWrite(ENA, motorSpeed);
+  analogWrite(ENB, motorSpeed);
+}
+
+void moveRight() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, motorSpeed);
+  analogWrite(ENB, motorSpeed);
+}
+
+void moveBackward() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+  analogWrite(ENA, motorSpeed);
+  analogWrite(ENB, motorSpeed);
+}
+
+void stopMotors() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
+}
+
+void loop() {
+  if (BT.available()) {    
+    char command = BT.read();
+    switch (command) {
+      case 'F': // Forward
+        moveForward();
+        break;
+
+      case 'L': // Left
+        moveLeft();
+        break;
+
+      case 'R': // Forward
+        moveRight();
+        break;
+
+      case 'B': // Backward
+        moveBackward();
+        break;
+
+      case 'S': // Stop
+        stopMotors();
+        break;
+
+      default:
+        Serial.println("Invalid command");
+        stopMotors(); // Stop on unknown command
+        break;
+    }
+  }
+}
+  /*for (int i = 0; i < 10; i++) {
+    delay(300);
+    moveForward();
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Moving Forward...");
+    lcd.setCursor(0, 1);
+    lcd.print("Time: ");
+    lcd.print(i);
+    lcd.print("s ");
+    delay(1000);
+    break;
+  }
+  stopMotors();
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Task Complete!");
+  delay(2000);
+  */
