@@ -54,15 +54,8 @@ void loop() {
     Serial.println(distance);
 		if (distance <= 30.0){
 			lcd.print("Obstacle!      ");
-      
-			/*
-      currentSpeedL = 0;
-			currentSpeedR = 0;
-			*/
-      ///*
 			currentSpeedL = -defaultSpeedL;
 			currentSpeedR = defaultSpeedR;
-			//*/
 		} else {
 			lcd.print("Moving forward!");
 			currentSpeedL = defaultSpeedL;

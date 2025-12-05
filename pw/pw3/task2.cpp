@@ -1,6 +1,3 @@
-// Entrance track: 27 up, -27 down
-// Inside track: 25 up, -28 down
-
 #include <Arduino.h>
 #include <LiquidCrystal.h>
 #include <math.h>
@@ -24,6 +21,8 @@ float q_angle = 0.001;
 float q_bias = 0.003;
 float r_measure = 0.03;
 
+int pitchOffset = -4;
+
 const int ENA = 11;
 const int IN1 = 13;
 const int IN2 = 12;
@@ -45,7 +44,6 @@ int currentSpeedL;
 int currentSpeedR;
 
 void setup() {
-  // hardware initializations
   lcd.begin(16, 2);
   Serial.begin(9600);
 
@@ -58,7 +56,6 @@ void setup() {
   mpu.setGyroRange(MPU6050_RANGE_500_DEG);
   mpu.setFilterBandwidth(MPU6050_BAND_10_HZ);
 
-  // allowing settings to take effect
   delay(100);
 
   pinMode(ENA, OUTPUT);
@@ -76,9 +73,6 @@ void setup() {
 }
 
 void loop() {
-  // offsets - -0.12, 0.05. -0.065
-
-
   if (analogRead(A0) > 600 && analogRead(A0) < 800){
     bool goingUp = false;
     bool circled = false;
@@ -99,21 +93,18 @@ void loop() {
       float dt = (millisNow - millisPrev) / 1000.0;
       millisPrev = millisNow;
 
-      pitch = atan2(a.acceleration.z, sqrt(pow(a.acceleration.y, 2) + pow(a.acceleration.x, 2))) / M_PI * 180 - 4;
+      pitch = atan2(a.acceleration.z, sqrt(pow(a.acceleration.y, 2) + pow(a.acceleration.x, 2))) / M_PI * 180 + pitchOffset;
       float correctGyroY = (round(g.gyro.y * 100)/100.0 + gyroYBias) * 180 / M_PI ;
       filteredPitch = kalmanFilter(pitch, correctGyroY, dt, filteredPitch, pitchBias);
 
       float correctedGyroX = (round(g.gyro.x * 100)/100.0 + gyroXBias) * dt * 180 / M_PI;
       yaw += correctedGyroX;
-      
-      //Serial.println(String(yaw) + " " + String(pitch));
 
       lcd.setCursor(0, 0);
       lcd.print("Yaw: " + String(yaw));
 
       lcd.setCursor(0, 1);
       lcd.print("Ramp Angle: " + String(maxAngle));
-      //lcd.print("Pitch: " + String(filteredPitch));
       
       if (pitch > maxAngle) maxAngle = pitch;
       if (pitch > 20) {

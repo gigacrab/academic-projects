@@ -1,6 +1,3 @@
-// 3 ir sensor
-// pid
-
 #include <Arduino.h>
 #include <LiquidCrystal.h>
 #include <math.h>
@@ -86,8 +83,6 @@ void loop() {
   if (analogRead(A0) > 600 && analogRead(A0) < 800){
     millisStart = millis();
     lcd.clear();
-    //lcd.setCursor(0, 0);
-    //lcd.print("Moving forward!");
 
     while(start){
       millisNow = millis();
@@ -159,46 +154,9 @@ void loop() {
 
         go(currentSpeedL, currentSpeedR);
       }
-
-      
-      /*boolean L = digitalRead(IR_L);
-      boolean M = digitalRead(IR_M);  
-      boolean R = digitalRead(IR_R);
-
-      byte pattern = (L << 2) | (M << 1) | R;
-
-      switch(pattern){
-        case 0b001:
-          go(defaultSpeedL / 2, motorspeedR);
-          break;
-        case 0b011:
-          go(-defaultSpeedL, motorspeedR);
-          break;
-        case 0b100:
-          go(defaultSpeedL, motorspeedR / 2);
-          break;
-        case 0b101:
-          go(defaultSpeedL, motorspeedR);
-          break;       
-        case 0b110:
-          go(defaultSpeedL, -motorspeedR);
-          break;
-        default:
-          go(0, 0);
-      }*/
-
-     
     }
     start = true;
     lcd.setCursor(0, 0);
-    //lcd.print("Select to start!");
-    //lcd.setCursor(0, 1);
-    /*lcd.print("Distance: ");
-    distance = (pulseCountRight + pulseCountLeft) / 2 * M_PI * 6.5 / 20;
-    Serial.println(pulseCountLeft);
-    Serial.println(pulseCountRight);
-    lcd.print(distance);
-    lcd.print("cm   ");*/
     pulseCountRight = 0;
     pulseCountLeft = 0;
   }
@@ -210,25 +168,12 @@ ISR(PCINT1_vect){
   // Rising edge: previous = 0, current = 1
   if (!(previousPortCState & (1 << 3)) && (currentPortCState  & (1 << 3))) {
     pulseCountLeft += (currentSpeedL > 0)? 1 : -1;
-    /*microNowLeft = micros();
-
-    if ((microNowLeft - prevMicroLeft) > 0) {
-        prevSampleLeft = microNowLeft - prevMicroLeft;
-        prevMicroLeft = microNowLeft;
-        pulseCountLeft += (currentSpeedL > 0)? 1 : -1;
-    }*/
   }
   previousPortCState = currentPortCState;
 }
 
 void INT0_ISR(void){
   pulseCountRight += (currentSpeedR > 0)? 1 : -1;
-  /*microNowRight = micros();
-  if (microNowRight - prevMicroRight > 0){
-    prevSampleRight = microNowRight - prevMicroRight; 
-    prevMicroRight = microNowRight;
-    pulseCountRight += (currentSpeedR > 0)? 1 : -1;
-  }*/
 }
 
 void go(int speedL, int speedR){ 
@@ -238,7 +183,6 @@ void go(int speedL, int speedR){
   digitalWrite(IN3, (speedL <= 0)? LOW : HIGH);
   digitalWrite(IN4, (speedL >= 0)? LOW : HIGH);
 
-  // Apply speed, constraining to the 0-255 PWM range
   analogWrite(ENB, constrain(abs(speedL), 0, 255));
   analogWrite(ENA, constrain(abs(speedR), 0, 255));
 }
