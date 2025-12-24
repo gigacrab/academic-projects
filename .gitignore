@@ -1,6 +1,4 @@
 *
 !.gitignore
-!pw/
-!pw/**
-!src/
-!src/main.cpp
+!Y1-S1/
+!Y1-S1/**

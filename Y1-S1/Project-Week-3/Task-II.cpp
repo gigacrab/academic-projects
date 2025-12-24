@@ -36,6 +36,7 @@ const int IR_L = 2;
 const int IR_R = A3;
 
 unsigned long millisNow, millisPrev;
+unsigned long millisSample;
 
 int defaultSpeedL = 255; // 107
 int defaultSpeedR = 255; // 150
@@ -97,6 +98,11 @@ void loop() {
       float correctGyroY = (round(g.gyro.y * 100)/100.0 + gyroYBias) * 180 / M_PI ;
       filteredPitch = kalmanFilter(pitch, correctGyroY, dt, filteredPitch, pitchBias);
 
+      if (millisNow - millisSample > 100) {
+        Serial.println("Time: " + String(millisNow) + ", Pitch: " + String(pitch) + ", Filtered Pitch: " + String(filteredPitch));
+        millisSample = millisNow;
+      }
+
       float correctedGyroX = (round(g.gyro.x * 100)/100.0 + gyroXBias) * dt * 180 / M_PI;
       yaw += correctedGyroX;
 
@@ -109,27 +115,27 @@ void loop() {
       if (pitch > maxAngle) maxAngle = pitch;
       if (pitch > 20) {
         goingUp = true;
-        Serial.println("going up state");
+        //Serial.println("going up state");
       } else if (goingUp && pitch < 10){
         static unsigned long millisStart = millisNow;
         if (millisNow - millisStart < 4000){
           go(0, 0);
           startYaw = yaw;
-          Serial.println("stopping state" + String(yaw) + " " + String(startYaw));
+          //Serial.println("stopping state" + String(yaw) + " " + String(startYaw));
         } else {
           if (!circled && yaw < startYaw + 330){
             go (-150, 255);
-            Serial.println("circling state" + String(yaw) + " " + String(startYaw));
+            //Serial.println("circling state" + String(yaw) + " " + String(startYaw));
           } 
           else {
             circled = true;
             go(107, 150);
-            Serial.println("done state");
+            //Serial.println("done state");
           }
         }
       } else {
         go (255, 255);
-        Serial.println("going straight");
+        //Serial.println("going straight");
       }
     }
   }

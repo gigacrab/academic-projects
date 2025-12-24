@@ -65,7 +65,7 @@ void setup() {
   pinMode(IR_L, INPUT);
 
   pinMode(ENCODER_R, INPUT);
-  pinMode(A3, INPUT);
+  pinMode(ENCODER_L, INPUT);
   attachInterrupt(digitalPinToInterrupt(ENCODER_R), INT0_ISR, RISING);
   PCICR |= (1 << PCIE1); // Enable PCINT1 group (for pin A0-A5)
   PCMSK1 |= (1 << PCINT11); // Enable PCINT11 (for pin A3)
