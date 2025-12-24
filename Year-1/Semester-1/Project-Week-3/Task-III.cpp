@@ -87,6 +87,6 @@ float detectDistance(){
 
 	float duration = pulseIn(ECHO, HIGH);
 	float distance = (duration * .0343) / 2;
-  return distance;
-  delay(100);
+	return distance;
+	delay(100);
 }
